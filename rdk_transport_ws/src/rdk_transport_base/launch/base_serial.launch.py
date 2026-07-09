@@ -1,0 +1,61 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument("serial_port", default_value=""),
+        DeclareLaunchArgument("serial_baudrate", default_value="115200"),
+        DeclareLaunchArgument("serial_write_commands", default_value="false"),
+        DeclareLaunchArgument("allow_protected_serial", default_value="false"),
+        DeclareLaunchArgument("serial_min_interval_sec", default_value="0.3"),
+        DeclareLaunchArgument("serial_heartbeat_sec", default_value="1.0"),
+        DeclareLaunchArgument("serial_heartbeat_command", default_value=""),
+        DeclareLaunchArgument("odom_rate_hz", default_value="30.0"),
+        DeclareLaunchArgument("cmd_vel_timeout_sec", default_value="0.5"),
+        DeclareLaunchArgument("disabled_encoder_index", default_value="-1"),
+        DeclareLaunchArgument("encoder_ticks_per_rev", default_value="1000.0"),
+        DeclareLaunchArgument("wheel_radius_m", default_value="0.05"),
+        DeclareLaunchArgument("wheel_base_x_m", default_value="0.20"),
+        DeclareLaunchArgument("wheel_base_y_m", default_value="0.18"),
+        DeclareLaunchArgument("encoder_signs", default_value="1,1,1,1"),
+        DeclareLaunchArgument("encoder_timeout_sec", default_value="0.3"),
+        DeclareLaunchArgument("encoder_max_delta_ticks", default_value="10000"),
+        DeclareLaunchArgument("encoder_max_speed_xy", default_value="0.30"),
+        DeclareLaunchArgument("encoder_max_wz", default_value="0.80"),
+        Node(
+            package="rdk_transport_base",
+            executable="base_bridge_node",
+            name="base_bridge_node",
+            output="screen",
+            parameters=[{
+                "mock_mode": False,
+                "serial_port": LaunchConfiguration("serial_port"),
+                "serial_baudrate": LaunchConfiguration("serial_baudrate"),
+                "serial_write_commands": LaunchConfiguration("serial_write_commands"),
+                "allow_protected_serial": LaunchConfiguration("allow_protected_serial"),
+                "serial_min_interval_sec": LaunchConfiguration("serial_min_interval_sec"),
+                "serial_heartbeat_sec": LaunchConfiguration("serial_heartbeat_sec"),
+                "serial_heartbeat_command": LaunchConfiguration("serial_heartbeat_command"),
+                "odom_frame_id": "odom",
+                "base_frame_id": "base_link",
+                "cmd_vel_topic": "/cmd_vel",
+                "odom_topic": "/odom",
+                "publish_tf": True,
+                "odom_rate_hz": LaunchConfiguration("odom_rate_hz"),
+                "cmd_vel_timeout_sec": LaunchConfiguration("cmd_vel_timeout_sec"),
+                "disabled_encoder_index": LaunchConfiguration("disabled_encoder_index"),
+                "encoder_ticks_per_rev": LaunchConfiguration("encoder_ticks_per_rev"),
+                "wheel_radius_m": LaunchConfiguration("wheel_radius_m"),
+                "wheel_base_x_m": LaunchConfiguration("wheel_base_x_m"),
+                "wheel_base_y_m": LaunchConfiguration("wheel_base_y_m"),
+                "encoder_signs": LaunchConfiguration("encoder_signs"),
+                "encoder_timeout_sec": LaunchConfiguration("encoder_timeout_sec"),
+                "encoder_max_delta_ticks": LaunchConfiguration("encoder_max_delta_ticks"),
+                "encoder_max_speed_xy": LaunchConfiguration("encoder_max_speed_xy"),
+                "encoder_max_wz": LaunchConfiguration("encoder_max_wz"),
+            }],
+        ),
+    ])

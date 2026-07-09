@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find rdk_transport_description)/urdf/wheelbot_reference/wheellegbot/common_inertia.xacro"/>
+
+  <xacro:macro name="base_xacro" params="xyz">
+    <link name="base_footprint"/>
+
+    <link name="base_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${xyz}"/>
+        </geometry>
+        <material name="wheelbot_base_blue">
+          <color rgba="0.1 0.1 1.0 0.5"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${xyz}"/>
+        </geometry>
+      </collision>
+      <xacro:box_inertia m="2.0" w="0.27" d="0.23" h="0.19"/>
+    </link>
+
+    <joint name="base_footprint_to_base_link" type="fixed">
+      <origin xyz="0.0 0.0 0.151" rpy="0.0 0.0 0.0"/>
+      <parent link="base_footprint"/>
+      <child link="base_link"/>
+    </joint>
+  </xacro:macro>
+</robot>

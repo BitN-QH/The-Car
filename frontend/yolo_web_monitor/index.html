@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RDK Robot Control</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #64748b;
+      --line: #d7dee8;
+      --panel: #ffffff;
+      --bg: #eef3f8;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --warn: #b45309;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+    main { width: min(1180px, calc(100% - 32px)); margin: 24px auto; display: grid; gap: 16px; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    .sub { margin-top: 4px; color: var(--muted); font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+    .metric-label { color: var(--muted); font-size: 13px; }
+    .metric-value { margin-top: 6px; font-size: 22px; font-weight: 700; overflow-wrap: anywhere; }
+    .command { color: var(--accent); }
+    .warn { color: var(--warn); }
+    .danger { color: var(--danger); }
+    .stage { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr); gap: 16px; align-items: start; }
+    .video-wrap { position: relative; background: #0f172a; border-radius: 8px; overflow: hidden; aspect-ratio: 4 / 3; min-height: 240px; }
+    #video, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleY(-1); transform-origin: center; }
+    #video { object-fit: contain; }
+    #overlay { pointer-events: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    textarea { width: 100%; min-height: 120px; resize: vertical; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    button, a.button { border: 0; border-radius: 6px; padding: 9px 12px; background: var(--accent); color: white; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; }
+    button.secondary { background: #334155; }
+    button.motion { background: var(--accent-2); min-width: 84px; min-height: 48px; }
+    button.danger { background: var(--danger); color: white; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .pad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    .pad button { width: 100%; }
+    .pad .wide { grid-column: 1 / -1; }
+    code, pre { display: block; white-space: pre-wrap; overflow-wrap: anywhere; background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 10px; max-height: 260px; overflow: auto; font-size: 12px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stage { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { main { width: min(100% - 20px, 1180px); margin: 14px auto; } .grid { grid-template-columns: 1fr; } h1 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>RDK Robot Control</h1>
+        <div class="sub">Live camera, YOLO overlay, and serial motion control</div>
+      </div>
+      <div class="sub" id="updated">waiting</div>
+    </header>
+
+    <section class="grid">
+      <div class="panel"><div class="metric-label">YOLO</div><div class="metric-value" id="yoloStatus">waiting</div></div>
+      <div class="panel"><div class="metric-label">Persons</div><div class="metric-value" id="personCount">0</div></div>
+      <div class="panel"><div class="metric-label">Mission</div><div class="metric-value" id="missionState">-</div></div>
+      <div class="panel"><div class="metric-label">Last command</div><div class="metric-value command" id="lastCommand">-</div></div>
+    </section>
+
+    <section class="stage">
+      <div class="panel">
+        <h2>Camera</h2>
+        <div class="video-wrap"><img id="video" src="/stream.mjpg" alt="camera stream"><canvas id="overlay"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Motion</h2>
+        <div class="pad">
+          <button class="motion" onclick="drive('(0,0,1)')">左旋</button>
+          <button class="motion" onclick="drive('(1,0,0)')">前进</button>
+          <button class="motion" onclick="drive('(0,0,-1)')">右旋</button>
+          <button class="motion" onclick="drive('(0,1,0)')">左移</button>
+          <button class="danger" onclick="drive('(0,0,0)')">停止</button>
+          <button class="motion" onclick="drive('(0,-1,0)')">右移</button>
+          <button class="motion wide" onclick="drive('(-1,0,0)')">后退</button>
+          <button class="motion" onclick="drive('up')">up</button>
+          <button class="motion" onclick="drive('down')">down</button>
+        </div>
+        <div class="actions">
+          <button class="danger" onclick="drive('(0,0,0)')">Stop robot</button>
+          <a class="button secondary" href="/api/logs">Download logs</a>
+        </div>
+        <table style="margin-top:12px">
+          <tbody>
+            <tr><th>Fork</th><td id="forkStatus">-</td></tr>
+            <tr><th>Best person</th><td id="bestPerson">-</td></tr>
+            <tr><th>Offset</th><td id="personOffset">-</td></tr>
+            <tr><th>Centered</th><td id="personCentered">-</td></tr>
+            <tr><th>Close</th><td id="personClose">-</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Detections</h2>
+      <table>
+        <thead><tr><th>Class</th><th>Score</th><th>Center x</th><th>Width</th><th>Height</th><th>Area</th></tr></thead>
+        <tbody id="detections"></tbody>
+      </table>
+    </section>
+
+    <section class="stage">
+      <div class="panel"><h2>Diagnostics</h2><pre id="diagnostics">[]</pre></div>
+      <div class="panel"><h2>Raw detection JSON</h2><code id="raw">{}</code></div>
+    </section>
+  </main>
+  <script>
+    const fmtTime = (ts) => ts ? new Date(ts * 1000).toLocaleTimeString() : "waiting";
+    const fixed = (v, n = 2) => Number.isFinite(v) ? v.toFixed(n) : "-";
+    let latestState = {};
+    async function postAction(path, body = "") {
+      const response = await fetch(path, {method: "POST", body});
+      if (!response.ok) alert(await response.text());
+    }
+    async function drive(command) {
+      const response = await fetch("/api/drive", {method: "POST", body: command});
+      if (!response.ok) {
+        alert(await response.text());
+      }
+    }
+    function drawOverlay(state) {
+      const img = document.getElementById("video");
+      const canvas = document.getElementById("overlay");
+      const rect = img.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      canvas.style.width = rect.width + "px";
+      canvas.style.height = rect.height + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const raw = state.raw || {};
+      const iw = Number(raw.image_width || state.image_width || 640);
+      const ih = Number(raw.image_height || state.image_height || 480);
+      const scale = Math.min(rect.width / iw, rect.height / ih);
+      const ox = (rect.width - iw * scale) / 2;
+      const oy = (rect.height - ih * scale) / 2;
+      const deadband = Number(state.center_deadband_ratio || 0.12);
+      ctx.fillStyle = "rgba(15,118,110,0.14)";
+      ctx.fillRect(ox + iw * (0.5 - deadband) * scale, oy, iw * deadband * 2 * scale, ih * scale);
+      ctx.strokeStyle = "rgba(255,255,255,0.75)";
+      ctx.beginPath(); ctx.moveTo(ox + iw * 0.5 * scale, oy); ctx.lineTo(ox + iw * 0.5 * scale, oy + ih * scale); ctx.stroke();
+      for (const d of state.detections || []) {
+        const b = d.bbox || {};
+        const x1 = Number(b.x1 ?? (Number(b.cx || 0) - Number(b.w || 0) / 2));
+        const y1 = Number(b.y1 ?? (Number(b.cy || 0) - Number(b.h || 0) / 2));
+        const w = Number(b.w || 0);
+        const h = Number(b.h || 0);
+        const isPerson = d.class_name === "person" || d.class_id === 0;
+        ctx.strokeStyle = isPerson ? "#22c55e" : "#38bdf8";
+        ctx.fillStyle = isPerson ? "rgba(34,197,94,0.20)" : "rgba(56,189,248,0.18)";
+        ctx.lineWidth = isPerson ? 3 : 2;
+        ctx.fillRect(ox + x1 * scale, oy + y1 * scale, w * scale, h * scale);
+        ctx.strokeRect(ox + x1 * scale, oy + y1 * scale, w * scale, h * scale);
+      }
+    }
+    function update(state) {
+      latestState = state;
+      document.getElementById("updated").textContent = "updated " + fmtTime(state.updated_at);
+      document.getElementById("missionState").textContent = state.mission_state || "-";
+      document.getElementById("lastCommand").textContent = state.last_command || "-";
+      document.getElementById("forkStatus").textContent = state.fork_status || "-";
+      const detections = state.detections || [];
+      const persons = detections.filter(d => d.class_name === "person" || d.class_id === 0);
+      document.getElementById("personCount").textContent = persons.length;
+      const best = state.best_person || null;
+      document.getElementById("bestPerson").textContent = best ? `score ${fixed(Number(best.score), 2)}, cx ${fixed(Number(best.cx_ratio) * 100, 1)}%` : "-";
+      document.getElementById("personOffset").textContent = best ? fixed(Number(best.offset_ratio) * 100, 1) + "%" : "-";
+      document.getElementById("personCentered").textContent = best ? (best.centered ? "yes" : "no") : "-";
+      document.getElementById("personClose").textContent = best ? (best.close ? "yes" : "no") : "-";
+      const stale = !state.updated_at || (Date.now() / 1000 - state.updated_at) > 2.5;
+      const yolo = document.getElementById("yoloStatus");
+      yolo.textContent = stale ? "waiting" : "online";
+      yolo.className = "metric-value " + (stale ? "warn" : "");
+      document.getElementById("detections").innerHTML = detections.map(d => {
+        const b = d.bbox || {};
+        return `<tr><td>${d.class_name ?? d.class_id ?? "-"}</td><td>${fixed(Number(d.score), 2)}</td><td>${fixed(Number(b.cx), 0)}</td><td>${fixed(Number(b.w), 0)}</td><td>${fixed(Number(b.h), 0)}</td><td>${fixed(Number(d.area_ratio), 3)}</td></tr>`;
+      }).join("") || '<tr><td colspan="6">No detections in current frame</td></tr>';
+      document.getElementById("diagnostics").textContent = JSON.stringify(state.diagnostics || [], null, 2);
+      document.getElementById("raw").textContent = JSON.stringify(state.raw || {}, null, 2);
+      drawOverlay(state);
+    }
+    const events = new EventSource("/events");
+    events.onmessage = (ev) => update(JSON.parse(ev.data));
+    events.onerror = () => {
+      document.getElementById("yoloStatus").textContent = "disconnected";
+      document.getElementById("yoloStatus").className = "metric-value warn";
+    };
+    window.addEventListener("resize", () => drawOverlay(latestState));
+  </script>
+</body>
+</html>

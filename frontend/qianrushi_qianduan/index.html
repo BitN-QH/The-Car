@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDK X5 具身智能全向搬运机器人 - 远程控制与运维平台</title>
+    <!-- 引入本地离线依赖库 -->
+    <script src="js/eventemitter2.min.js"></script>
+    <script src="js/roslib.min.js"></script>
+    <script src="js/nipplejs.min.js"></script>
+    <!-- 引入样式文件 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 头部 Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" width="32" height="32">
+                    <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12a10 10 0 0 1 10-10zm1 10.5V8h-2v4.5l2.25 2.25 1.414-1.414L13 12.5z" fill="currentColor"/>
+                    <rect x="7" y="11" width="10" height="2" rx="1" fill="currentColor"/>
+                    <path d="M12 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" fill="currentColor"/>
+                </svg>
+                <div class="logo-text">
+                    <h1>RDK X5 具身智能</h1>
+                    <span>远程控制与运维平台 v1.0</span>
+                </div>
+            </div>
+            
+            <div class="header-status">
+                <!-- 连接指示器 -->
+                <div id="connection-badge" class="badge badge-disconnected">
+                    <span class="badge-dot"></span>
+                    <span id="connection-status-text">未连接</span>
+                </div>
+                <!-- 紧急停止按钮 -->
+                <button id="estop-btn" class="btn-estop">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                    </svg>
+                    <span>E-STOP 急停</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区域 Grid Layout -->
+        <main class="app-main">
+            <!-- 左侧面板 Left Column: 控制与配置 -->
+            <section class="panel panel-left">
+                <!-- 1. 连接配置 -->
+                <div class="card card-config">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm0-9a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2zm0 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="currentColor"/>
+                            <path d="M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" fill="currentColor"/>
+                        </svg>
+                        <h2>通讯与连接配置 (2.4G WiFi)</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="rdk-ip">地瓜派 IP</label>
+                            <div class="input-action-row">
+                                <input type="text" id="rdk-ip" value="192.168.39.26" placeholder="192.168.39.26">
+                                <button id="apply-rdk-ip-btn" class="btn-mini" type="button">套用</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="rdk-http-url">地瓜派 HTTP 地址</label>
+                            <input type="text" id="rdk-http-url" value="http://192.168.39.26:8080" placeholder="http://[地瓜派IP]:8080">
+                        </div>
+                        <div class="form-group">
+                            <label for="ros-ip">VLM HTTP 桥接状态（无需 9090）</label>
+                            <input type="text" id="ros-ip" value="http://192.168.39.26:8080/api/vlm" placeholder="VLM 通过地瓜派 HTTP 桥接 /prompt_text 与 /tts_text">
+                        </div>
+                        <div class="form-group">
+                            <label for="video-url">视频流地址</label>
+                            <input type="text" id="video-url" value="http://192.168.39.26:8080/stream.mjpg" placeholder="http://[地瓜派IP]:8080/stream.mjpg">
+                        </div>
+                        <button id="connect-btn" class="btn btn-primary">开始连接</button>
+                    </div>
+                </div>
+
+                <!-- 2. 手动遥控与速度 -->
+                <div class="card card-teleop">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-4 2a4 4 0 1 1 8 0 4 4 0 0 1-8 0z" fill="currentColor"/>
+                        </svg>
+                        <h2>手动遥控面板 (麦克纳姆轮)</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- 手动速度显示 -->
+                        <div class="telemetry-compact">
+                            <div class="telemetry-item-mini">
+                                <span class="label">vx (前进)</span>
+                                <span id="val-vx" class="value text-cyan">0.00 m/s</span>
+                            </div>
+                            <div class="telemetry-item-mini">
+                                <span class="label">vy (横移)</span>
+                                <span id="val-vy" class="value text-cyan">0.00 m/s</span>
+                            </div>
+                            <div class="telemetry-item-mini">
+                                <span class="label">wz (旋转)</span>
+                                <span id="val-wz" class="value text-cyan">0.00 rad/s</span>
+                            </div>
+                        </div>
+
+                        <!-- 地瓜派 HTTP 小车控制按键 -->
+                        <div class="drive-button-grid">
+                            <button id="drive-rotate-left" class="btn btn-secondary drive-btn" data-command="(0,0,1)">左旋</button>
+                            <button id="drive-forward" class="btn btn-primary drive-btn" data-command="(1,0,0)">前进</button>
+                            <button id="drive-rotate-right" class="btn btn-secondary drive-btn" data-command="(0,0,-1)">右旋</button>
+                            <button id="drive-left" class="btn btn-secondary drive-btn" data-command="(0,1,0)">左移</button>
+                            <button id="drive-stop" class="btn btn-danger drive-btn" data-command="(0,0,0)">停止</button>
+                            <button id="drive-right" class="btn btn-secondary drive-btn" data-command="(0,-1,0)">右移</button>
+                            <button id="drive-backward" class="btn btn-secondary drive-btn drive-wide" data-command="(-1,0,0)">后退</button>
+                        </div>
+
+                        <!-- 虚拟摇杆容器 -->
+                        <div class="joystick-container">
+                            <div id="joystick-zone"></div>
+                            <span class="joystick-tip">使用虚拟摇杆或键盘 [W,A,S,D] 键进行全向移动控制</span>
+                        </div>
+
+                        <!-- 速度限制调节 -->
+                        <div class="form-group slider-group">
+                            <div class="slider-header">
+                                <label for="speed-limit">线速度限幅 (m/s)</label>
+                                <span id="val-speed-limit">0.5</span>
+                            </div>
+                            <input type="range" id="speed-limit" min="0.1" max="1.5" step="0.1" value="0.5">
+                        </div>
+                        <div class="form-group slider-group">
+                            <div class="slider-header">
+                                <label for="yaw-limit">角速度限幅 (rad/s)</label>
+                                <span id="val-yaw-limit">0.8</span>
+                            </div>
+                            <input type="range" id="yaw-limit" min="0.2" max="2.0" step="0.1" value="0.8">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 叉车机构控制 -->
+                <div class="card card-forklift">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M19 13h-6V7h6v6zm-8-6H5v6h6V7zm10-2v14H3V5h18zm-2 2H5v10h14V7zM6 18h12v-2H6v2z" fill="currentColor"/>
+                        </svg>
+                        <h2>叉取执行机构控制</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="forklift-control-wrapper">
+                            <!-- 升降控制滑块 -->
+                            <div class="forklift-slider-container">
+                                <input type="range" id="forklift-height" min="0" max="100" value="0" orient="vertical">
+                                <div class="slider-labels">
+                                    <span>最高 (100%)</span>
+                                    <span>过渡</span>
+                                    <span>最低 (0%)</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 叉车状态指示 -->
+                            <div class="forklift-status-panel">
+                                <div class="status-indicator-box">
+                                    <span class="label">当前高度</span>
+                                    <span id="forklift-height-val" class="value text-cyan">0 mm</span>
+                                </div>
+                                <div class="status-indicator-box">
+                                    <span class="label">载荷状态</span>
+                                    <span id="forklift-payload-val" class="value text-green">空载 (0 kg)</span>
+                                </div>
+                                <div class="status-control-buttons">
+                                    <button id="fork-lift-btn" class="btn btn-secondary">一键升起 (托盘)</button>
+                                    <button id="fork-lower-btn" class="btn btn-secondary">一键下降 (放平)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 中间面板 Center Column: 2D 地图与导航 -->
+            <section class="panel panel-center">
+                <!-- 4. 2D 交互地图 -->
+                <div class="card card-map">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48v15.26c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" fill="currentColor"/>
+                        </svg>
+                        <h2>SLAM 2D 交互式高精度地图</h2>
+                        <div class="map-controls-group">
+                            <button id="sim-step-scale" class="btn-map-control btn-map-control-subtle" title="sim move scale">1</button>
+                            <button id="map-zoom-in" class="btn-map-control" title="放大">+</button>
+                            <button id="map-zoom-out" class="btn-map-control" title="缩小">-</button>
+                            <button id="map-reset" class="btn-map-control" title="复位视角">☉</button>
+                        </div>
+                    </div>
+                    <div class="card-body map-body">
+                        <!-- 地图画板 -->
+                        <div class="map-canvas-container">
+                            <canvas id="map-canvas"></canvas>
+                            <!-- 地图浮窗指示 -->
+                            <div class="map-overlay-tip">
+                                <span>按住鼠标左键拖拽平移，滚轮缩放</span>
+                                <span class="divider">|</span>
+                                <span class="highlight">双击地图任意位置设置 Nav2 导航目标点</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. 导航与定位坐标控制 -->
+                <div class="card card-nav-coords">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" fill="currentColor"/>
+                        </svg>
+                        <h2>精确定位与自主导航控制 (Nav2)</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="coords-layout">
+                            <!-- 当前位姿 -->
+                            <div class="coords-block">
+                                <h3>当前机器人位姿 (里程计/AMCL)</h3>
+                                <div class="coords-grid">
+                                    <div class="coord-item">
+                                        <span class="label">X 坐标:</span>
+                                        <span id="robot-x" class="value">0.00 m</span>
+                                    </div>
+                                    <div class="coord-item">
+                                        <span class="label">Y 坐标:</span>
+                                        <span id="robot-y" class="value">0.00 m</span>
+                                    </div>
+                                    <div class="coord-item">
+                                        <span class="label">Yaw 航向:</span>
+                                        <span id="robot-yaw" class="value">0.0°</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 目标坐标输入 -->
+                            <div class="coords-block">
+                                <h3>手动下发导航目标坐标 (Nav2 Target)</h3>
+                                <div class="coords-input-grid">
+                                    <div class="coord-input-item">
+                                        <label for="target-x">X (m)</label>
+                                        <input type="number" id="target-x" value="1.50" step="0.1">
+                                    </div>
+                                    <div class="coord-input-item">
+                                        <label for="target-y">Y (m)</label>
+                                        <input type="number" id="target-y" value="-0.80" step="0.1">
+                                    </div>
+                                    <div class="coord-input-item">
+                                        <label for="target-yaw">航向 (°)</label>
+                                        <input type="number" id="target-yaw" value="90" step="5">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="nav-action-buttons">
+                            <button id="nav-start-btn" class="btn btn-primary">开始自主导航</button>
+                            <button id="nav-cancel-btn" class="btn btn-danger">取消导航</button>
+                            <button id="slam-save-btn" class="btn btn-secondary">保存 SLAM 地图</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧面板 Right Column: VLM, YOLO 与遥测 -->
+            <section class="panel panel-right">
+                <!-- 6. VLM 智能助理 -->
+                <div class="card card-vlm">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 2c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12h2c0 4.41 3.59 8 8 8s8-3.59 8-8-3.59-8-8-8v2c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h2c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4v2l-3-3 3-3v2z" fill="currentColor"/>
+                        </svg>
+                        <h2>大模型智能助手</h2>
+                    </div>
+                    <div class="card-body chat-body">
+                        <div class="chat-mode-switch" role="group" aria-label="大模型模式">
+                            <button id="chat-mode-model" class="chat-mode-btn active" data-mode="model" type="button">叉车大模型</button>
+                            <button id="chat-mode-vlm" class="chat-mode-btn" data-mode="vlm" type="button">视觉大模型</button>
+                        </div>
+                        <!-- 对话显示窗口 -->
+                        <div id="chat-messages" class="chat-messages">
+                            <div class="chat-message bot">
+                                <div class="message-content">
+                                    你好！我是机器人的大模型助手。你可以直接描述叉车搬运、搜索、巡检或控制任务。
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI 推理链展示 -->
+                        <div id="vlm-reasoning-panel" class="vlm-reasoning">
+                            <div class="reasoning-header">
+                                <span class="reasoning-dot pulse-purple"></span>
+                                <h4>大模型任务状态</h4>
+                            </div>
+                            <div id="vlm-reasoning-content" class="reasoning-content">
+                                等待自然语言指令输入...
+                            </div>
+                        </div>
+
+                        <!-- 对话输入栏 -->
+                        <div class="chat-input-area">
+                            <textarea id="chat-input" placeholder="输入叉车任务（例如：'去B区搜索蓝色托盘并插取运送回装车区'）..." rows="2"></textarea>
+                            <button id="chat-send-btn" class="btn btn-primary btn-icon-only" title="发送指令">
+                                <svg viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. YOLO 目标识别画面 -->
+                <div class="card card-vision">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
+                        </svg>
+                        <h2>YOLO 多模态视觉监测 (RGB-D)</h2>
+                    </div>
+                    <div class="card-body vision-body">
+                        <div class="vision-container">
+                            <div class="vision-toolbar">
+                                <span>YOLO运行画面</span>
+                                <div class="yolo-source-switch" role="group" aria-label="YOLO source">
+                                    <button id="yolo-source-primary" class="source-btn active" data-source="primary" type="button">主摄像头</button>
+                                    <button id="yolo-source-aux" class="source-btn" data-source="aux" type="button">副摄像头</button>
+                                </div>
+                            </div>
+
+                            <!-- 主摄像头画面 Canvas/Image -->
+                            <div class="camera-grid">
+                                <div class="camera-panel active-yolo" data-source="primary">
+                                    <div class="camera-title">
+                                        <span>主摄像头</span>
+                                        <span class="camera-source-tag">YOLO</span>
+                                    </div>
+                                    <div class="video-feed-wrapper">
+                                        <canvas id="vision-canvas"></canvas>
+                                        <img id="video-stream-img" class="hidden" alt="Primary camera feed">
+                                        <div id="video-disconnect-overlay" class="video-overlay">
+                                            <svg viewBox="0 0 24 24" width="48" height="48">
+                                                <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM2.27 2.27L1 3.54l3 3V17c0 1.1.9 2 2 2h10.46l3.72 3.72 1.27-1.27L2.27 2.27zM6 17V8.54l8.46 8.46H6z" fill="currentColor"/>
+                                            </svg>
+                                            <span>未开启视频流</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <details class="aux-camera-drawer">
+                                <summary>
+                                    <span>副摄像头</span>
+                                    <span class="drawer-status">二级界面</span>
+                                </summary>
+                                <div class="camera-grid aux-camera-grid">
+                                <div class="camera-panel" data-source="aux">
+                                    <div class="camera-title">
+                                        <span>副摄像头</span>
+                                        <span class="camera-source-tag">预览</span>
+                                    </div>
+                                    <div class="video-feed-wrapper">
+                                        <canvas id="vision-canvas-aux"></canvas>
+                                        <img id="video-stream-img-aux" class="hidden" alt="Secondary camera feed">
+                                        <div id="video-disconnect-overlay-aux" class="video-overlay">
+                                            <svg viewBox="0 0 24 24" width="48" height="48">
+                                                <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM2.27 2.27L1 3.54l3 3V17c0 1.1.9 2 2 2h10.46l3.72 3.72 1.27-1.27L2.27 2.27zM6 17V8.54l8.46 8.46H6z" fill="currentColor"/>
+                                            </svg>
+                                            <span>未开启副摄像头</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </details>
+
+                            <!-- YOLO 检测结果日志 -->
+                            <div class="vision-labels">
+                                <div class="label-header">
+                                    <span>实时识别列表</span>
+                                    <span class="pulse-red">YOLO 运行中</span>
+                                </div>
+                                <div id="vision-object-list" class="label-list">
+                                    <div class="label-item">等待数据输入...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 8. 核心硬件与状态遥测 -->
+                <div class="card card-telemetry">
+                    <div class="card-header">
+                        <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" fill="currentColor"/>
+                        </svg>
+                        <h2>多传感器与核心硬件遥测</h2>
+                    </div>
+                    <div class="card-body telemetry-body">
+                        <!-- 上位机：RDK X5 -->
+                        <div class="telemetry-section">
+                            <h3>RDK X5 上位机状态</h3>
+                            <div class="telemetry-grid-3">
+                                <div class="telemetry-gauge">
+                                    <span class="label">CPU 负载</span>
+                                    <span id="rdk-cpu" class="value text-cyan">28%</span>
+                                    <div class="progress-bar"><div id="rdk-cpu-bar" class="progress-fill bg-cyan" style="width: 28%"></div></div>
+                                </div>
+                                <div class="telemetry-gauge">
+                                    <span class="label">内存占用</span>
+                                    <span id="rdk-ram" class="value text-cyan">42%</span>
+                                    <div class="progress-bar"><div id="rdk-ram-bar" class="progress-fill bg-cyan" style="width: 42%"></div></div>
+                                </div>
+                                <div class="telemetry-gauge">
+                                    <span class="label">CPU 温度</span>
+                                    <span id="rdk-temp" class="value text-orange">45°C</span>
+                                    <div class="progress-bar"><div id="rdk-temp-bar" class="progress-fill bg-orange" style="width: 45%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 下位机：STM32 -->
+                        <div class="telemetry-section border-top">
+                            <h3>STM32 下位机底盘状态</h3>
+                            <div class="telemetry-grid-2">
+                                <div class="telemetry-item">
+                                    <span class="label">IMU 姿态航向 (Yaw)</span>
+                                    <span id="stm-yaw" class="value text-purple">125.4°</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="label">底盘里程计 (Odom)</span>
+                                    <span id="stm-odom" class="value">X: 1.25m, Y: -0.42m</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="label">电机反馈转速 (LF/RF/LB/RB)</span>
+                                    <span id="stm-motors" class="value font-mono">120/122/119/121 RPM</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="label">与 RDK X5 串口通讯</span>
+                                    <span id="stm-uart-status" class="value text-green">正常 (115200 bps)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 机器人电量 -->
+                        <div class="telemetry-section border-top">
+                            <div class="battery-wrapper">
+                                <div class="battery-left">
+                                    <svg viewBox="0 0 24 24" width="28" height="28" class="text-green" id="battery-svg">
+                                        <path d="M17 5H3c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm1 9h-2V9h2v5z" fill="currentColor"/>
+                                        <rect x="3" y="7" width="10" height="10" fill="currentColor"/>
+                                    </svg>
+                                    <div class="battery-text">
+                                        <span class="label">动力电池电量 (LiPo 4S)</span>
+                                        <span id="battery-voltage" class="value-sub">16.2 V (单节 4.05V)</span>
+                                    </div>
+                                </div>
+                                <div class="battery-right">
+                                    <span id="battery-percent" class="value-large text-green">85%</span>
+                                </div>
+                            </div>
+                            <div class="progress-bar battery-progress"><div id="battery-bar" class="progress-fill bg-green" style="width: 85%"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部面板 Bottom Panel: 任务管理与日志 -->
+        <footer class="app-footer">
+            <!-- 9. 任务序列管理器 -->
+            <div class="card card-tasks">
+                <div class="card-header">
+                    <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/>
+                    </svg>
+                    <h2>具身任务序列流水线 (Task Queue)</h2>
+                    <div class="task-presets">
+                        <button id="btn-add-nav" class="btn-task-add">+ 到点导航</button>
+                        <button id="btn-add-search" class="btn-task-add">+ YOLO目标搜索</button>
+                        <button id="btn-add-lift" class="btn-task-add">+ 自动叉取</button>
+                        <button id="btn-add-drop" class="btn-task-add">+ 自动卸货</button>
+                        <button id="btn-add-patrol" class="btn-task-add">+ 区域巡检</button>
+                    </div>
+                </div>
+                <div class="card-body tasks-body">
+                    <div class="tasks-wrapper">
+                        <!-- 任务控制 -->
+                        <div class="tasks-controls">
+                            <button id="task-run-btn" class="btn btn-success">
+                                <span>启动队列</span>
+                            </button>
+                            <button id="task-pause-btn" class="btn btn-warning">
+                                <span>暂停队列</span>
+                            </button>
+                            <button id="task-clear-btn" class="btn btn-danger">
+                                <span>清空队列</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 任务流水线水平时间轴 -->
+                        <div id="tasks-timeline" class="tasks-timeline">
+                            <div class="timeline-empty">暂无任务，请在上方添加任务或输入 VLM 自然语言指令</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 10. 系统日志与异常警报 -->
+            <div class="card card-logs">
+                <div class="card-header">
+                    <svg class="card-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M13 14h-2v-4h2v4zm0 4h-2v-2h2v2zm-12 2h22L12 2 1 20z" fill="currentColor"/>
+                    </svg>
+                    <h2>系统运行日志与安全报警</h2>
+                    <button id="log-clear-btn" class="btn-log-clear">清除日志</button>
+                </div>
+                <div class="card-body logs-body">
+                    <!-- 警报横幅 (动态显示) -->
+                    <div id="alert-banner" class="alert-banner hidden">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <span id="alert-message">警报：动力电池电量过低 (低于 15%)，请注意安全并及时充电！</span>
+                    </div>
+                    
+                    <!-- 日志输出窗 -->
+                    <div id="log-container" class="log-container">
+                        <div class="log-row info">
+                            <span class="log-time">19:15:30</span>
+                            <span class="log-tag">[SYSTEM]</span>
+                            <span class="log-msg">远程控制平台前端初始化完成。当前运行于本地仿真环境。</span>
+                        </div>
+                        <div class="log-row info">
+                            <span class="log-time">19:15:31</span>
+                            <span class="log-tag">[SIMULATOR]</span>
+                            <span class="log-msg">虚拟机器底盘加载完成，麦克纳姆轮动力学参数已配置。</span>
+                        </div>
+                        <div class="log-row info">
+                            <span class="log-time">19:15:31</span>
+                            <span class="log-tag">[SIMULATOR]</span>
+                            <span class="log-msg">虚拟 YOLO 检测模型加载完成。</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 脚本逻辑入口 -->
+    <script src="js/app.js?v=20260709-openclaw-live"></script>
+</body>
+</html>

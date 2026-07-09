@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find rdk_transport_description)/urdf/wheelbot_reference/wheellegbot/common_inertia.xacro"/>
+
+  <xacro:macro name="camera_xacro" params="xyz">
+    <link name="camera_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.10 0.02"/>
+        </geometry>
+        <material name="wheelbot_camera_black">
+          <color rgba="0 0 0 0.5"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.10 0.02"/>
+        </geometry>
+      </collision>
+      <xacro:box_inertia m="0.1" w="0.02" d="0.10" h="0.02"/>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="camera_link"/>
+      <origin xyz="${xyz}"/>
+    </joint>
+  </xacro:macro>
+</robot>

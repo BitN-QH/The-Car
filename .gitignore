@@ -1,0 +1,38 @@
+# Build and install outputs
+build/
+install/
+log/
+logs/
+.colcon/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Runtime logs and captures
+*.log
+*.pid
+*.bag
+*.db3
+*.mcap
+*.xwd
+
+# Large model/data artifacts
+models/
+*.bin
+*.onnx
+*.engine
+*.pt
+*.pth
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Frontend test output
+test-results/
+playwright-report/

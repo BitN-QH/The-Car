@@ -1,0 +1,23 @@
+/lslidar_driver_node:
+  ros__parameters:
+    frame_id: laser
+    group_ip: 224.1.1.2
+    add_multicast: false
+    device_ip: 192.168.1.200
+    device_ip_difop: 192.168.1.102
+    msop_port: 2368
+    difop_port: 2369
+    lidar_name: N10
+    angle_disable_min: 0.0
+    angle_disable_max: 0.0
+    min_range: 0.2
+    max_range: 200.0
+    use_gps_ts: false
+    scan_topic: /scan
+    interface_selection: serial
+    serial_port_: /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A50285BI-if00-port0
+    high_reflection: false
+    compensation: false
+    pubScan: true
+    pubPointCloud2: false
+    pointcloud_topic: /lslidar_point_cloud

@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<robot name="rdk_transport_robot">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.42 0.34 0.12"/>
+      </geometry>
+      <material name="base_gray">
+        <color rgba="0.25 0.28 0.30 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.42 0.34 0.12"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="laser">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.04"/>
+      </geometry>
+      <material name="laser_blue">
+        <color rgba="0.1 0.35 0.9 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_to_laser" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser"/>
+    <origin xyz="0.12 0.0 0.18" rpy="0 0 0"/>
+  </joint>
+
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size="0.04 0.03 0.01"/>
+      </geometry>
+      <material name="imu_green">
+        <color rgba="0.1 0.7 0.25 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_to_imu" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0.0 0.0 0.08" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.05 0.08 0.04"/>
+      </geometry>
+      <material name="camera_black">
+        <color rgba="0.02 0.02 0.02 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_to_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.15 0.0 0.22" rpy="0 0 0"/>
+  </joint>
+
+  <link name="depth_camera_link">
+    <visual>
+      <geometry>
+        <box size="0.05 0.10 0.04"/>
+      </geometry>
+      <material name="depth_camera_purple">
+        <color rgba="0.35 0.18 0.55 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_to_depth_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="depth_camera_link"/>
+    <origin xyz="0.15 0.0 0.22" rpy="0 0 0"/>
+  </joint>
+
+  <link name="fork_link">
+    <visual>
+      <origin xyz="0.12 0 0.02" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.24 0.16 0.025"/>
+      </geometry>
+      <material name="fork_orange">
+        <color rgba="0.9 0.45 0.08 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_to_fork" type="fixed">
+    <parent link="base_link"/>
+    <child link="fork_link"/>
+    <origin xyz="0.18 0.0 0.03" rpy="0 0 0"/>
+  </joint>
+</robot>
